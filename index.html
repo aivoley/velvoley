@@ -69,18 +69,21 @@
     <button onclick="video.currentTime += 0.1">⏩ +0.1s</button>
     <button onclick="video.currentTime -= 1">⏮ -1s</button>
     <button onclick="video.currentTime += 1">⏭ +1s</button>
+    <button id="undo">↩️ Deshacer punto</button>
   </div>
 
   <div id="output">📌 Cargá un video y pausalo. Luego hacé dos clics sobre los extremos de la red (9 m).</div>
 
   <button id="resetBtn">Reset</button>
-  <button id="exportBtn">📄 Exportar CSV</button>
+  <button id="exportBtn">📤 Exportar CSV</button>
 
   <div id="historial">
     <h3>Historial de Mediciones</h3>
     <ul id="listaHistorial"></ul>
+    <canvas id="chart" width="600" height="300"></canvas>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     const video = document.getElementById("video");
     const videoInput = document.getElementById("videoInput");
@@ -93,6 +96,9 @@
     const exportBtn = document.getElementById("exportBtn");
     const togglePlay = document.getElementById("togglePlay");
     const listaHistorial = document.getElementById("listaHistorial");
+    const undoBtn = document.getElementById("undo");
+    const chartCanvas = document.getElementById("chart");
+    let chart;
 
     let clicks = [];
     let escala = null;
@@ -166,19 +172,23 @@
         const metros = distPixeles * escala;
         const tiempo = Math.abs(tiempo2 - tiempo1);
         const velocidad = (metros / tiempo) * 3.6;
+        const angulo = Math.atan2(dy, dx) * (180 / Math.PI);
         resultado = {
           distancia: metros.toFixed(2),
           tiempo: tiempo.toFixed(2),
           velocidad: velocidad.toFixed(2),
+          angulo: angulo.toFixed(2),
           unidad: "km/h"
         };
         historial.push(resultado);
         mostrarHistorial();
+        graficarHistorial();
         output.innerHTML = `
           📏 Distancia: ${resultado.distancia} m<br>
           ⏱ Tiempo: ${resultado.tiempo} s<br>
           🚀 Velocidad: <strong>${resultado.velocidad} km/h</strong><br>
-          🔀 Presioná Reset para nueva medicion.`;
+          📐 Ángulo: ${resultado.angulo}°<br>
+          🔁 Presioná Reset para nueva medición.`;
         state = "completo";
       }
     });
@@ -187,8 +197,33 @@
       listaHistorial.innerHTML = "";
       historial.forEach((r, i) => {
         const li = document.createElement("li");
-        li.textContent = `#${i + 1} - ${r.distancia} m / ${r.tiempo} s / ${r.velocidad} km/h`;
+        li.textContent = `#${i + 1} - ${r.distancia} m / ${r.tiempo} s / ${r.velocidad} km/h / ${r.angulo}°`;
         listaHistorial.appendChild(li);
+      });
+    }
+
+    function graficarHistorial() {
+      const labels = historial.map((_, i) => `#${i + 1}`);
+      const data = historial.map(r => r.velocidad);
+      if (chart) chart.destroy();
+      chart = new Chart(chartCanvas, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Velocidad (km/h)',
+            data,
+            backgroundColor: 'rgba(54, 162, 235, 0.5)'
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
       });
     }
 
@@ -208,9 +243,9 @@
         alert("No hay datos para exportar.");
         return;
       }
-      let csv = "Distancia (m),Tiempo (s),Velocidad (km/h)\n";
+      let csv = "Distancia (m),Tiempo (s),Velocidad (km/h),Ángulo (°)\n";
       historial.forEach(r => {
-        csv += `${r.distancia},${r.tiempo},${r.velocidad}\n`;
+        csv += `${r.distancia},${r.tiempo},${r.velocidad},${r.angulo}\n`;
       });
       const blob = new Blob([csv], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
@@ -231,6 +266,14 @@
     });
     video.addEventListener("pause", () => togglePlay.innerText = "▶️ Play");
     video.addEventListener("play", () => togglePlay.innerText = "⏸️ Pausa");
+
+    undoBtn.addEventListener("click", () => {
+      clicks.pop();
+      clearCanvas();
+      mostrarHistorial();
+      initCanvas();
+      output.innerHTML += "<br>↩️ Último punto deshecho. Repetí el paso.";
+    });
 
     modeSelector.addEventListener("change", () => {
       const mode = modeSelector.value;
@@ -271,5 +314,6 @@
   </script>
 </body>
 </html>
+
 
 
