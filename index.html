@@ -1,262 +1,219 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8" />
-<title>Vóley Tracker - Tracking Automático Básico</title>
-<style>
-  body { font-family: Arial, sans-serif; text-align:center; padding: 20px; }
-  #container { position: relative; display: inline-block; }
-  video, canvas { max-width: 100%; border: 2px solid #333; }
-  #overlay { position: absolute; top: 0; left: 0; pointer-events:none; }
-  #output { margin-top: 20px; font-size: 18px; }
-  button, select { margin: 5px; padding: 5px 10px; }
-  #historial { margin-top: 20px; max-width: 600px; margin-left: auto; margin-right: auto; text-align:left; }
-</style>
+  <meta charset="UTF-8">
+  <title>Vóley Tracker - Tracking Automático</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+    #container { position: relative; display: inline-block; }
+    video, canvas { max-width: 100%; border: 2px solid #333; }
+    #overlay { position: absolute; top: 0; left: 0; pointer-events: none; }
+    button, input, select { margin: 5px; padding: 6px 10px; }
+    #output { margin-top: 15px; font-size: 16px; }
+    #historial { text-align: left; max-width: 600px; margin: 20px auto; }
+  </style>
 </head>
 <body>
 
-<h2>🏐 Vóley Tracker - Tracking Automático Básico</h2>
+<h2>🏐 Vóley Tracker con Tracking Automático</h2>
 
-<label>Modo de video:</label>
+<label>Modo:</label>
 <select id="mode">
-  <option value="file">Video Grabado</option>
-  <option value="live">Cámara en Vivo</option>
+  <option value="file">📂 Video Grabado</option>
+  <option value="live">🎥 Cámara en Vivo</option>
 </select><br>
 
-<input type="file" accept="video/*" id="videoInput" /><br>
-<button id="startCamera" style="display:none;">Activar Cámara</button><br><br>
+<input type="file" accept="video/*" id="videoInput" style="display:inline;" />
+<button id="startCamera" style="display:none;">Iniciar Cámara</button><br>
 
 <div id="container">
-  <video id="video" controls autoplay muted></video>
+  <video id="video" controls muted></video>
   <canvas id="overlay"></canvas>
 </div>
 
 <div>
-  <button id="togglePlay">▶️ Play</button>
-  <button id="resetBtn">Reset</button>
+  <button id="togglePlay">▶️ Play / Pausa</button>
+  <button id="stepBack">⏪ -1 frame</button>
+  <button id="stepForward">⏩ +1 frame</button>
+  <button id="resetBtn">🔁 Reset</button>
 </div>
 
-<div id="output">📌 Cargá un video y pausalo. Luego hacé dos clics sobre los extremos de la red (9 m).</div>
+<div id="output">📌 Cargá un video y pausalo. Luego hacé dos clics sobre la red.</div>
 
 <div id="historial">
-  <h3>Historial de Mediciones</h3>
+  <h3>📋 Historial</h3>
   <ul id="listaHistorial"></ul>
 </div>
 
 <script>
-const video = document.getElementById('video');
-const videoInput = document.getElementById('videoInput');
-const startCamera = document.getElementById('startCamera');
-const modeSelector = document.getElementById('mode');
-const overlay = document.getElementById('overlay');
-const ctx = overlay.getContext('2d');
-const output = document.getElementById('output');
-const togglePlay = document.getElementById('togglePlay');
-const resetBtn = document.getElementById('resetBtn');
-const listaHistorial = document.getElementById('listaHistorial');
+const video = document.getElementById("video");
+const overlay = document.getElementById("overlay");
+const ctx = overlay.getContext("2d");
+const output = document.getElementById("output");
+const togglePlay = document.getElementById("togglePlay");
+const resetBtn = document.getElementById("resetBtn");
+const stepBack = document.getElementById("stepBack");
+const stepForward = document.getElementById("stepForward");
+const listaHistorial = document.getElementById("listaHistorial");
+const videoInput = document.getElementById("videoInput");
+const startCamera = document.getElementById("startCamera");
+const mode = document.getElementById("mode");
 
-let stream = null;
-let escala = null;
 let clicks = [];
-let state = 'marcarRed';
-let historial = [];
-
-let previousFrame = null;
+let escala = null;
+let tracking = false;
 let trackingData = [];
-let trackingActive = false;
+let previousFrame = null;
 
-function initCanvas() {
+video.addEventListener("loadedmetadata", () => {
   overlay.width = video.videoWidth;
   overlay.height = video.videoHeight;
-}
-video.addEventListener('loadedmetadata', () => {
-  initCanvas();
 });
 
-function clearCanvas() {
-  ctx.clearRect(0, 0, overlay.width, overlay.height);
-}
-
-function drawPoint(x,y,color='red') {
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.arc(x,y,5,0,2*Math.PI);
-  ctx.fill();
-}
-
-function drawLine(p1,p2,color='green') {
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(p1.x,p1.y);
-  ctx.lineTo(p2.x,p2.y);
-  ctx.stroke();
-}
-
-function drawBox(x,y,w,h,color='red') {
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 3;
-  ctx.strokeRect(x,y,w,h);
-}
-
-overlay.addEventListener('click', (e) => {
-  if(state !== 'marcarRed') return; // Solo para definir la red
-  
+overlay.addEventListener("click", (e) => {
+  if (clicks.length >= 2) return;
   const rect = video.getBoundingClientRect();
   const scaleX = video.videoWidth / rect.width;
   const scaleY = video.videoHeight / rect.height;
   const x = (e.clientX - rect.left) * scaleX;
   const y = (e.clientY - rect.top) * scaleY;
-
-  clicks.push({x,y});
-  drawPoint(x,y,'green');
-
-  if(clicks.length === 2){
-    drawLine(clicks[0], clicks[1], 'green');
+  clicks.push({x, y});
+  drawPoint(x, y, "green");
+  if (clicks.length === 2) {
+    drawLine(clicks[0], clicks[1], "green");
     const dx = clicks[1].x - clicks[0].x;
     const dy = clicks[1].y - clicks[0].y;
-    const distPix = Math.sqrt(dx*dx + dy*dy);
-    escala = 9 / distPix;
-    output.innerHTML = `✅ Escala definida: 1 px = ${escala.toFixed(4)} m<br>Presioná ▶️ Play para iniciar tracking automático.`;
-    state = 'tracking';
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    escala = 9 / dist;
+    output.innerHTML = `✅ Escala definida: 1 px = ${escala.toFixed(4)} m.<br>Presioná ▶️ para iniciar tracking.`;
+    tracking = true;
+    trackMotion();
   }
 });
 
-function differenceFrames(frame1, frame2, width, height) {
-  let maxDiff = 0;
-  let maxX = 0, maxY = 0;
+function drawPoint(x, y, color = "red") {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y, 5, 0, 2 * Math.PI);
+  ctx.fill();
+}
 
-  for(let y=0; y < height; y+=4) {
-    for(let x=0; x < width; x+=4) {
+function drawLine(p1, p2, color = "green") {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(p1.x, p1.y);
+  ctx.lineTo(p2.x, p2.y);
+  ctx.stroke();
+}
+
+function getDiff(frame1, frame2, width, height) {
+  let maxDiff = 0, maxX = 0, maxY = 0;
+  for (let y = 0; y < height; y += 4) {
+    for (let x = 0; x < width; x += 4) {
       const i = (y * width + x) * 4;
-      const diff = Math.abs(frame1.data[i] - frame2.data[i]) + 
-                   Math.abs(frame1.data[i+1] - frame2.data[i+1]) + 
-                   Math.abs(frame1.data[i+2] - frame2.data[i+2]);
-      if(diff > maxDiff) {
-        maxDiff = diff;
+      const d = Math.abs(frame1.data[i] - frame2.data[i]) +
+                Math.abs(frame1.data[i+1] - frame2.data[i+1]) +
+                Math.abs(frame1.data[i+2] - frame2.data[i+2]);
+      if (d > maxDiff) {
+        maxDiff = d;
         maxX = x;
         maxY = y;
       }
     }
   }
-  return {maxDiff, maxX, maxY};
+  return {maxX, maxY};
 }
 
-function processFrame() {
-  if(video.paused || video.ended || !trackingActive) return;
-
+function trackMotion() {
+  if (!tracking || video.paused || video.ended) return;
   ctx.drawImage(video, 0, 0, overlay.width, overlay.height);
   const frame = ctx.getImageData(0, 0, overlay.width, overlay.height);
-
-  if(previousFrame){
-    const {maxDiff, maxX, maxY} = differenceFrames(previousFrame, frame, overlay.width, overlay.height);
-
-    // Definir caja alrededor
-    const boxSize = 40;
-    let boxX = Math.max(0, maxX - boxSize/2);
-    let boxY = Math.max(0, maxY - boxSize/2);
-    if(boxX + boxSize > overlay.width) boxX = overlay.width - boxSize;
-    if(boxY + boxSize > overlay.height) boxY = overlay.height - boxSize;
-
-    drawBox(boxX, boxY, boxSize, boxSize, 'red');
-
-    // Guardar posición centro
-    const centerX = boxX + boxSize/2;
-    const centerY = boxY + boxSize/2;
-
-    trackingData.push({time: video.currentTime, x: centerX, y: centerY});
-
-    if(trackingData.length >= 2){
-      // Calcular distancia y velocidad entre últimos dos puntos
-      const p1 = trackingData[trackingData.length-2];
-      const p2 = trackingData[trackingData.length-1];
-      const dx = p2.x - p1.x;
-      const dy = p2.y - p1.y;
-      const distPix = Math.sqrt(dx*dx + dy*dy);
-      const metros = distPix * escala;
-      const dt = p2.time - p1.time;
-      if(dt > 0){
-        const velocidad = (metros / dt) * 3.6;
-        output.innerHTML = `🚀 Velocidad actual estimada: <strong>${velocidad.toFixed(2)} km/h</strong><br>
-          Tiempo: ${p2.time.toFixed(2)} s<br>
-          Distancia entre frames: ${metros.toFixed(2)} m`;
-      }
+  if (previousFrame) {
+    const {maxX, maxY} = getDiff(previousFrame, frame, overlay.width, overlay.height);
+    ctx.strokeStyle = "red";
+    ctx.strokeRect(maxX - 20, maxY - 20, 40, 40);
+    const now = video.currentTime;
+    trackingData.push({x: maxX, y: maxY, t: now});
+    if (trackingData.length > 1) {
+      const a = trackingData[trackingData.length - 2];
+      const b = trackingData[trackingData.length - 1];
+      const dpix = Math.hypot(b.x - a.x, b.y - a.y);
+      const dmetros = dpix * escala;
+      const dt = b.t - a.t;
+      const v = dt > 0 ? (dmetros / dt) * 3.6 : 0;
+      output.innerHTML = `🚀 Velocidad: <b>${v.toFixed(2)} km/h</b><br>Tiempo: ${b.t.toFixed(2)}s`;
     }
   }
   previousFrame = frame;
-
-  requestAnimationFrame(processFrame);
+  requestAnimationFrame(trackMotion);
 }
 
-togglePlay.addEventListener('click', () => {
-  if(video.paused){
+togglePlay.addEventListener("click", () => {
+  if (video.paused) {
     video.play();
-    togglePlay.innerText = '⏸️ Pausa';
-    if(state === 'tracking') {
-      trackingActive = true;
-      processFrame();
-    }
+    trackMotion();
   } else {
     video.pause();
-    togglePlay.innerText = '▶️ Play';
-    trackingActive = false;
   }
 });
 
-resetBtn.addEventListener('click', () => {
+stepBack.addEventListener("click", () => {
+  video.pause();
+  video.currentTime = Math.max(0, video.currentTime - 1 / 30);
+});
+
+stepForward.addEventListener("click", () => {
+  video.pause();
+  video.currentTime = Math.min(video.duration, video.currentTime + 1 / 30);
+});
+
+resetBtn.addEventListener("click", () => {
   clicks = [];
   escala = null;
   previousFrame = null;
   trackingData = [];
-  trackingActive = false;
-  state = 'marcarRed';
-  clearCanvas();
-  output.innerHTML = "📌 Cargá un video y pausalo. Luego hacé dos clics sobre los extremos de la red (9 m).";
+  tracking = false;
+  ctx.clearRect(0, 0, overlay.width, overlay.height);
+  output.innerText = "📌 Cargá un video y pausalo. Luego hacé dos clics sobre la red.";
 });
 
-modeSelector.addEventListener('change', () => {
-  if(modeSelector.value === 'file'){
-    videoInput.style.display = 'inline';
-    startCamera.style.display = 'none';
-    stopCamera();
-  } else {
-    videoInput.style.display = 'none';
-    startCamera.style.display = 'inline';
-  }
-});
-
-videoInput.addEventListener('change', (e) => {
+videoInput.addEventListener("change", (e) => {
   const file = e.target.files[0];
-  if(file){
+  if (file) {
     stopCamera();
     video.srcObject = null;
     video.src = URL.createObjectURL(file);
   }
 });
 
-startCamera.addEventListener('click', async () => {
+startCamera.addEventListener("click", async () => {
   try {
-    stream = await navigator.mediaDevices.getUserMedia({video:true});
+    const stream = await navigator.mediaDevices.getUserMedia({video: true});
     video.srcObject = stream;
-  } catch(e) {
-    alert('No se pudo acceder a la cámara: ' + e.message);
+  } catch (err) {
+    alert("No se pudo iniciar la cámara");
   }
 });
 
-function stopCamera(){
-  if(stream){
-    stream.getTracks().forEach(t => t.stop());
-    stream = null;
+function stopCamera() {
+  if (video.srcObject) {
+    video.srcObject.getTracks().forEach(track => track.stop());
   }
 }
 
-function clearCanvas() {
-  ctx.clearRect(0, 0, overlay.width, overlay.height);
-}
+mode.addEventListener("change", () => {
+  if (mode.value === "file") {
+    videoInput.style.display = "inline";
+    startCamera.style.display = "none";
+    stopCamera();
+  } else {
+    videoInput.style.display = "none";
+    startCamera.style.display = "inline";
+  }
+});
 </script>
 
 </body>
 </html>
-
-
 
