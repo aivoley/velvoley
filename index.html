@@ -35,6 +35,14 @@
     .controls {
       margin-top: 10px;
     }
+    #historial {
+      margin-top: 20px;
+      font-size: 16px;
+      text-align: left;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
   </style>
 </head>
 <body>
@@ -56,8 +64,7 @@
   </div>
 
   <div class="controls">
-    <button onclick="video.play()">▶️ Play</button>
-    <button onclick="video.pause()">⏸️ Pausa</button>
+    <button id="togglePlay">▶️ Play</button>
     <button onclick="video.currentTime -= 0.1">⏪ -0.1s</button>
     <button onclick="video.currentTime += 0.1">⏩ +0.1s</button>
     <button onclick="video.currentTime -= 1">⏮ -1s</button>
@@ -65,9 +72,14 @@
   </div>
 
   <div id="output">📌 Cargá un video y pausalo. Luego hacé dos clics sobre los extremos de la red (9 m).</div>
-  
+
   <button id="resetBtn">Reset</button>
-  <button id="exportBtn">📤 Exportar Datos</button>
+  <button id="exportBtn">📄 Exportar CSV</button>
+
+  <div id="historial">
+    <h3>Historial de Mediciones</h3>
+    <ul id="listaHistorial"></ul>
+  </div>
 
   <script>
     const video = document.getElementById("video");
@@ -79,12 +91,15 @@
     const output = document.getElementById("output");
     const resetBtn = document.getElementById("resetBtn");
     const exportBtn = document.getElementById("exportBtn");
+    const togglePlay = document.getElementById("togglePlay");
+    const listaHistorial = document.getElementById("listaHistorial");
 
     let clicks = [];
     let escala = null;
     let tiempo1 = null;
     let tiempo2 = null;
     let resultado = null;
+    let historial = [];
     let state = "marcarRed";
     let stream = null;
 
@@ -128,52 +143,54 @@
         drawLine(clicks[0], clicks[1], "green");
         drawPoint(clicks[0].x, clicks[0].y, "green");
         drawPoint(clicks[1].x, clicks[1].y, "green");
-
         const dx = clicks[1].x - clicks[0].x;
         const dy = clicks[1].y - clicks[0].y;
         const distPixeles = Math.sqrt(dx * dx + dy * dy);
         escala = 9 / distPixeles;
-
         output.innerHTML = `✅ Escala definida: 1 px = ${escala.toFixed(4)} m<br>Ahora marcá el punto de inicio del movimiento.`;
         clicks = [];
         state = "marcarMovimiento";
       }
-
       else if (state === "marcarMovimiento" && clicks.length === 1) {
         drawPoint(x, y, "red");
         tiempo1 = video.currentTime;
         output.innerHTML = "🔴 Punto inicial marcado. Ahora marcá el punto final del movimiento.";
       }
-
       else if (state === "marcarMovimiento" && clicks.length === 2) {
         drawPoint(x, y, "red");
         drawLine(clicks[0], clicks[1], "red");
         tiempo2 = video.currentTime;
-
         const dx = clicks[1].x - clicks[0].x;
         const dy = clicks[1].y - clicks[0].y;
         const distPixeles = Math.sqrt(dx * dx + dy * dy);
         const metros = distPixeles * escala;
         const tiempo = Math.abs(tiempo2 - tiempo1);
         const velocidad = (metros / tiempo) * 3.6;
-
         resultado = {
           distancia: metros.toFixed(2),
           tiempo: tiempo.toFixed(2),
           velocidad: velocidad.toFixed(2),
           unidad: "km/h"
         };
-
+        historial.push(resultado);
+        mostrarHistorial();
         output.innerHTML = `
           📏 Distancia: ${resultado.distancia} m<br>
           ⏱ Tiempo: ${resultado.tiempo} s<br>
           🚀 Velocidad: <strong>${resultado.velocidad} km/h</strong><br>
-          🔁 Presioná Reset para empezar otra medición.
-        `;
-
+          🔀 Presioná Reset para nueva medicion.`;
         state = "completo";
       }
     });
+
+    function mostrarHistorial() {
+      listaHistorial.innerHTML = "";
+      historial.forEach((r, i) => {
+        const li = document.createElement("li");
+        li.textContent = `#${i + 1} - ${r.distancia} m / ${r.tiempo} s / ${r.velocidad} km/h`;
+        listaHistorial.appendChild(li);
+      });
+    }
 
     resetBtn.addEventListener("click", () => {
       clicks = [];
@@ -187,18 +204,33 @@
     });
 
     exportBtn.addEventListener("click", () => {
-      if (!resultado) {
+      if (historial.length === 0) {
         alert("No hay datos para exportar.");
         return;
       }
-      const data = `Distancia (m),Tiempo (s),Velocidad (km/h)\n${resultado.distancia},${resultado.tiempo},${resultado.velocidad}`;
-      const blob = new Blob([data], { type: "text/csv" });
+      let csv = "Distancia (m),Tiempo (s),Velocidad (km/h)\n";
+      historial.forEach(r => {
+        csv += `${r.distancia},${r.tiempo},${r.velocidad}\n`;
+      });
+      const blob = new Blob([csv], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "medicion_voley.csv";
+      a.download = "historial_mediciones.csv";
       a.click();
     });
+
+    togglePlay.addEventListener("click", () => {
+      if (video.paused) {
+        video.play();
+        togglePlay.innerText = "⏸️ Pausa";
+      } else {
+        video.pause();
+        togglePlay.innerText = "▶️ Play";
+      }
+    });
+    video.addEventListener("pause", () => togglePlay.innerText = "▶️ Play");
+    video.addEventListener("play", () => togglePlay.innerText = "⏸️ Pausa");
 
     modeSelector.addEventListener("change", () => {
       const mode = modeSelector.value;
@@ -239,4 +271,5 @@
   </script>
 </body>
 </html>
+
 
