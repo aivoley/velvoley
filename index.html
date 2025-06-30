@@ -32,6 +32,9 @@
       margin-top: 20px;
       font-size: 18px;
     }
+    .controls {
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
@@ -52,8 +55,19 @@
     <canvas id="overlay"></canvas>
   </div>
 
+  <div class="controls">
+    <button onclick="video.play()">▶️ Play</button>
+    <button onclick="video.pause()">⏸️ Pausa</button>
+    <button onclick="video.currentTime -= 0.1">⏪ -0.1s</button>
+    <button onclick="video.currentTime += 0.1">⏩ +0.1s</button>
+    <button onclick="video.currentTime -= 1">⏮ -1s</button>
+    <button onclick="video.currentTime += 1">⏭ +1s</button>
+  </div>
+
   <div id="output">📌 Cargá un video y pausalo. Luego hacé dos clics sobre los extremos de la red (9 m).</div>
+  
   <button id="resetBtn">Reset</button>
+  <button id="exportBtn">📤 Exportar Datos</button>
 
   <script>
     const video = document.getElementById("video");
@@ -64,11 +78,13 @@
     const modeSelector = document.getElementById("mode");
     const output = document.getElementById("output");
     const resetBtn = document.getElementById("resetBtn");
+    const exportBtn = document.getElementById("exportBtn");
 
     let clicks = [];
     let escala = null;
     let tiempo1 = null;
     let tiempo2 = null;
+    let resultado = null;
     let state = "marcarRed";
     let stream = null;
 
@@ -141,12 +157,20 @@
         const tiempo = Math.abs(tiempo2 - tiempo1);
         const velocidad = (metros / tiempo) * 3.6;
 
+        resultado = {
+          distancia: metros.toFixed(2),
+          tiempo: tiempo.toFixed(2),
+          velocidad: velocidad.toFixed(2),
+          unidad: "km/h"
+        };
+
         output.innerHTML = `
-          📏 Distancia: ${metros.toFixed(2)} m<br>
-          ⏱ Tiempo: ${tiempo.toFixed(2)} s<br>
-          🚀 Velocidad: <strong>${velocidad.toFixed(2)} km/h</strong><br>
+          📏 Distancia: ${resultado.distancia} m<br>
+          ⏱ Tiempo: ${resultado.tiempo} s<br>
+          🚀 Velocidad: <strong>${resultado.velocidad} km/h</strong><br>
           🔁 Presioná Reset para empezar otra medición.
         `;
+
         state = "completo";
       }
     });
@@ -156,9 +180,24 @@
       escala = null;
       tiempo1 = null;
       tiempo2 = null;
+      resultado = null;
       state = "marcarRed";
       clearCanvas();
       output.innerHTML = "📌 Cargá un video y pausalo. Luego hacé dos clics sobre los extremos de la red (9 m).";
+    });
+
+    exportBtn.addEventListener("click", () => {
+      if (!resultado) {
+        alert("No hay datos para exportar.");
+        return;
+      }
+      const data = `Distancia (m),Tiempo (s),Velocidad (km/h)\n${resultado.distancia},${resultado.tiempo},${resultado.velocidad}`;
+      const blob = new Blob([data], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "medicion_voley.csv";
+      a.click();
     });
 
     modeSelector.addEventListener("change", () => {
