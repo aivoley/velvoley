@@ -4,17 +4,51 @@
   <meta charset="UTF-8">
   <title>Vóley Tracker</title>
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; padding: 20px; margin: 0; }
-    #container { position: relative; width: 960px; height: 540px; margin: auto; }
-    video, canvas { width: 960px; height: 540px; border: 2px solid #333; display: block; }
-    #overlay { position: absolute; top: 0; left: 0; pointer-events: auto; } /* ← Habilita clics */
-    button, input, select { margin: 5px; padding: 6px 10px; font-size: 14px; }
-    #output { margin-top: 15px; font-size: 16px; }
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+      margin: 0;
+    }
+    #container {
+      position: relative;
+      width: 960px;
+      height: 540px;
+      margin: auto;
+    }
+    video, canvas {
+      width: 960px;
+      height: 540px;
+      border: 2px solid #333;
+      display: block;
+    }
+    #video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1; /* debajo del canvas */
+    }
+    #overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 10; /* encima del video */
+      pointer-events: auto; /* permite clics */
+    }
+    button, input, select {
+      margin: 5px;
+      padding: 6px 10px;
+      font-size: 14px;
+    }
+    #output {
+      margin-top: 15px;
+      font-size: 16px;
+    }
   </style>
 </head>
 <body>
 
-<h2>🏐 Vóley Tracker - Control Manual y Automático</h2>
+<h2>🏐 Vóley Tracker - Seguimiento Automático</h2>
 
 <div>
   <label>Modo:</label>
@@ -43,7 +77,7 @@
   <button id="resetBtn">🔁 Reset</button>
 </div>
 
-<div id="output">📌 Cargá un video y pausalo. Luego usá los botones para marcar referencia y trackear.</div>
+<div id="output">📌 Cargá un video o activá la cámara. Luego usá los botones para marcar referencia y trackear.</div>
 
 <script>
 const video = document.getElementById("video");
@@ -237,3 +271,4 @@ mode.addEventListener("change", () => {
 
 </body>
 </html>
+
