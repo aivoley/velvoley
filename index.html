@@ -7,7 +7,7 @@
     body { font-family: Arial, sans-serif; text-align: center; padding: 20px; margin: 0; }
     #container { position: relative; width: 960px; height: 540px; margin: auto; }
     video, canvas { width: 960px; height: 540px; border: 2px solid #333; display: block; }
-    #overlay { position: absolute; top: 0; left: 0; pointer-events: none; }
+    #overlay { position: absolute; top: 0; left: 0; pointer-events: auto; } /* ← Habilita clics */
     button, input, select { margin: 5px; padding: 6px 10px; font-size: 14px; }
     #output { margin-top: 15px; font-size: 16px; }
   </style>
@@ -107,8 +107,8 @@ overlay.addEventListener("click", (e) => {
 
 iniciarBtn.addEventListener("click", () => {
   tracking = true;
-  trackMotion();
   output.innerHTML = "🟢 Tracking activo...";
+  trackMotion();
 });
 
 function drawPoint(x, y, color = "red") {
