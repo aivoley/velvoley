@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Vóley Tracker - Velocidad en Video</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+    video, canvas {
+      max-width: 100%;
+      border: 2px solid #333;
+      cursor: crosshair;
+    }
+    #container {
+      position: relative;
+      display: inline-block;
+    }
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+    }
+    button, select {
+      margin: 5px;
+      padding: 5px 10px;
+    }
+    #output {
+      margin-top: 20px;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>🏐 Vóley Tracker: Velocidad desde Video</h2>
+
+  <label>Modo de video:</label>
+  <select id="mode">
+    <option value="file">Video Grabado</option>
+    <option value="live">Cámara en Vivo</option>
+  </select><br>
+
+  <input type="file" accept="video/*" id="videoInput"><br>
+  <button id="startCamera" style="display:none;">Activar Cámara</button><br><br>
+
+  <div id="container">
+    <video id="video" controls autoplay muted></video>
+    <canvas id="overlay"></canvas>
+  </div>
+
+  <div id="output"></div>
+  <button id="resetBtn">Reset</button>
+
+  <script>
+    const video = document.getElementById("video");
+    const videoInput = document.getElementById("videoInput");
+    const startCamera = document.getElementById("startCamera");
+    const overlay = document.getElementById("overlay");
+    const ctx = overlay.getContext("2d");
+    const modeSelector = document.getElementById("mode");
+    const output = document.getElementById("output");
+    const resetBtn = document.getElementById("resetBtn");
+
+    let clicks = [];
+    let escala = null;
+    let tiempo1 = null;
+    let tiempo2 = null;
+    let state = "marcarRed"; // "marcarRed", "marcarMovimiento", "completo"
+    let stream = null;
+
+    function clearCanvas() {
+      ctx.clearRect(0, 0, overlay.width, overlay.height);
+    }
+
+    function drawPoint(x, y, color = "red") {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(x, y, 5, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+
+    function drawLine(p1, p2, color = "blue") {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.stroke();
+    }
+
+    function initCanvas() {
+      overlay.width = video.videoWidth;
+      overlay.height = video.videoHeight;
+    }
+
+    video.addEventListener("loadedmetadata", initCanvas);
+
+    overlay.addEventListener("click", (e) => {
+      const rect = video.getBoundingClientRect();
+      const scaleX = video.videoWidth / rect.width;
+      const scaleY = video.videoHeight / rect.height;
+      const x = (e.clientX - rect.left) * scaleX;
+      const y = (e.clientY - rect.top) * scaleY;
+
+      clicks.push({ x, y });
+
+      if (state === "marcarRed" && clicks.length === 2) {
+        drawLine(clicks[0], clicks[1], "green");
+        drawPoint(clicks[0].x, clicks[0].y, "green");
+        drawPoint(clicks[1].x, clicks[1].y, "green");
+
+        const dx = clicks[1].x - clicks[0].x;
+        const dy = clicks[1].y - clicks[0].y;
+        const distPixeles = Math.sqrt(dx * dx + dy * dy);
+        escala = 9 / distPixeles;
+
+        output.innerHTML = `✅ Escala definida: 1 px = ${escala.toFixed(4)} m<br>Ahora marcá inicio y fin del movimiento.`;
+        clicks = [];
+        state = "marcarMovimiento";
+      }
+
+      else if (state === "marcarMovimiento" && clicks.length === 1) {
+        drawPoint(x, y, "red");
+        tiempo1 = video.currentTime;
+      }
+
+      else if (state === "marcarMovimiento" && clicks.length === 2) {
+        drawPoint(x, y, "red");
+        drawLine(clicks[0], clicks[1], "red");
+        tiempo2 = video.currentTime;
+
+        const dx = clicks[1].x - clicks[0].x;
+        const dy = clicks[1].y - clicks[0].y;
+        const distPixeles = Math.sqrt(dx * dx + dy * dy);
+        const metros = distPixeles * escala;
+        const tiempo = Math.abs(tiempo2 - tiempo1);
+        const velocidad = (metros / tiempo) * 3.6;
+
+        output.innerHTML = `
+          📏 Distancia: ${metros.toFixed(2)} m<br>
+          ⏱ Tiempo: ${tiempo.toFixed(2)} s<br>
+          🚀 Velocidad: <strong>${velocidad.toFixed(2)} km/h</strong>
+        `;
+        state = "completo";
+      }
+    });
+
+    resetBtn.addEventListener("click", () => {
+      clicks = [];
+      escala = null;
+      tiempo1 = null;
+      tiempo2 = null;
+      state = "marcarRed";
+      clearCanvas();
+      output.innerHTML = "";
+    });
+
+    modeSelector.addEventListener("change", () => {
+      const mode = modeSelector.value;
+      if (mode === "file") {
+        videoInput.style.display = "inline";
+        startCamera.style.display = "none";
+        stopCamera();
+      } else {
+        videoInput.style.display = "none";
+        startCamera.style.display = "inline";
+      }
+    });
+
+    videoInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        stopCamera();
+        video.srcObject = null;
+        video.src = URL.createObjectURL(file);
+      }
+    });
+
+    startCamera.addEventListener("click", async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+      } catch (err) {
+        alert("No se pudo acceder a la cámara: " + err.message);
+      }
+    });
+
+    function stopCamera() {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+      }
+    }
+  </script>
+</body>
+</html>
