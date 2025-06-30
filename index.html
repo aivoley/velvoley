@@ -22,7 +22,7 @@
       position: absolute;
       top: 0;
       left: 0;
-      pointer-events: none;
+      pointer-events: auto;
     }
     button, select {
       margin: 5px;
@@ -52,7 +52,7 @@
     <canvas id="overlay"></canvas>
   </div>
 
-  <div id="output"></div>
+  <div id="output">📌 Cargá un video y pausalo. Luego hacé dos clics sobre los extremos de la red (9 m).</div>
   <button id="resetBtn">Reset</button>
 
   <script>
@@ -69,7 +69,7 @@
     let escala = null;
     let tiempo1 = null;
     let tiempo2 = null;
-    let state = "marcarRed"; // "marcarRed", "marcarMovimiento", "completo"
+    let state = "marcarRed";
     let stream = null;
 
     function clearCanvas() {
@@ -118,7 +118,7 @@
         const distPixeles = Math.sqrt(dx * dx + dy * dy);
         escala = 9 / distPixeles;
 
-        output.innerHTML = `✅ Escala definida: 1 px = ${escala.toFixed(4)} m<br>Ahora marcá inicio y fin del movimiento.`;
+        output.innerHTML = `✅ Escala definida: 1 px = ${escala.toFixed(4)} m<br>Ahora marcá el punto de inicio del movimiento.`;
         clicks = [];
         state = "marcarMovimiento";
       }
@@ -126,6 +126,7 @@
       else if (state === "marcarMovimiento" && clicks.length === 1) {
         drawPoint(x, y, "red");
         tiempo1 = video.currentTime;
+        output.innerHTML = "🔴 Punto inicial marcado. Ahora marcá el punto final del movimiento.";
       }
 
       else if (state === "marcarMovimiento" && clicks.length === 2) {
@@ -143,7 +144,8 @@
         output.innerHTML = `
           📏 Distancia: ${metros.toFixed(2)} m<br>
           ⏱ Tiempo: ${tiempo.toFixed(2)} s<br>
-          🚀 Velocidad: <strong>${velocidad.toFixed(2)} km/h</strong>
+          🚀 Velocidad: <strong>${velocidad.toFixed(2)} km/h</strong><br>
+          🔁 Presioná Reset para empezar otra medición.
         `;
         state = "completo";
       }
@@ -156,7 +158,7 @@
       tiempo2 = null;
       state = "marcarRed";
       clearCanvas();
-      output.innerHTML = "";
+      output.innerHTML = "📌 Cargá un video y pausalo. Luego hacé dos clics sobre los extremos de la red (9 m).";
     });
 
     modeSelector.addEventListener("change", () => {
@@ -198,3 +200,4 @@
   </script>
 </body>
 </html>
+
