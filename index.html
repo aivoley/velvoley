@@ -2,33 +2,38 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Vóley Tracker - Tracking Automático</title>
+  <title>Vóley Tracker</title>
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
-    #container { position: relative; display: inline-block; }
-    video, canvas { max-width: 100%; border: 2px solid #333; }
+    body { font-family: Arial, sans-serif; text-align: center; padding: 20px; margin: 0; }
+    #container { position: relative; width: 960px; height: 540px; margin: auto; }
+    video, canvas { width: 960px; height: 540px; border: 2px solid #333; display: block; }
     #overlay { position: absolute; top: 0; left: 0; pointer-events: none; }
-    button, input, select { margin: 5px; padding: 6px 10px; }
+    button, input, select { margin: 5px; padding: 6px 10px; font-size: 14px; }
     #output { margin-top: 15px; font-size: 16px; }
-    #historial { text-align: left; max-width: 600px; margin: 20px auto; }
   </style>
 </head>
 <body>
 
-<h2>🏐 Vóley Tracker con Tracking Automático</h2>
+<h2>🏐 Vóley Tracker - Control Manual y Automático</h2>
 
-<label>Modo:</label>
-<select id="mode">
-  <option value="file">📂 Video Grabado</option>
-  <option value="live">🎥 Cámara en Vivo</option>
-</select><br>
-
-<input type="file" accept="video/*" id="videoInput" style="display:inline;" />
-<button id="startCamera" style="display:none;">Iniciar Cámara</button><br>
+<div>
+  <label>Modo:</label>
+  <select id="mode">
+    <option value="file">📂 Video Grabado</option>
+    <option value="live">🎥 Cámara en Vivo</option>
+  </select>
+  <input type="file" accept="video/*" id="videoInput" />
+  <button id="startCamera" style="display:none;">Iniciar Cámara</button>
+</div>
 
 <div id="container">
   <video id="video" controls muted></video>
   <canvas id="overlay"></canvas>
+</div>
+
+<div>
+  <button id="marcarReferencia">📏 Marcar referencia (2 clics)</button>
+  <button id="iniciarTracking" disabled>🚀 Iniciar Tracking</button>
 </div>
 
 <div>
@@ -38,52 +43,52 @@
   <button id="resetBtn">🔁 Reset</button>
 </div>
 
-<div id="output">📌 Cargá un video y pausalo. Luego hacé dos clics sobre la red.</div>
-
-<div id="historial">
-  <h3>📋 Historial</h3>
-  <ul id="listaHistorial"></ul>
-</div>
+<div id="output">📌 Cargá un video y pausalo. Luego usá los botones para marcar referencia y trackear.</div>
 
 <script>
 const video = document.getElementById("video");
 const overlay = document.getElementById("overlay");
 const ctx = overlay.getContext("2d");
 const output = document.getElementById("output");
+
 const togglePlay = document.getElementById("togglePlay");
 const resetBtn = document.getElementById("resetBtn");
 const stepBack = document.getElementById("stepBack");
 const stepForward = document.getElementById("stepForward");
+
 const videoInput = document.getElementById("videoInput");
 const startCamera = document.getElementById("startCamera");
 const mode = document.getElementById("mode");
+
+const marcarBtn = document.getElementById("marcarReferencia");
+const iniciarBtn = document.getElementById("iniciarTracking");
 
 let clicks = [];
 let escala = null;
 let tracking = false;
 let trackingData = [];
 let previousFrame = null;
+let esperandoClics = false;
+
+overlay.width = 960;
+overlay.height = 540;
 
 video.addEventListener("loadedmetadata", () => {
-  overlay.width = video.videoWidth;
-  overlay.height = video.videoHeight;
+  output.innerHTML = "📌 Video cargado. Usá el botón para marcar referencia.";
+});
+
+marcarBtn.addEventListener("click", () => {
+  clicks = [];
   ctx.clearRect(0, 0, overlay.width, overlay.height);
-  output.innerHTML = "🎯 Hacé clic en los dos extremos de la red (9 m) para calibrar la escala.";
+  output.innerHTML = "🎯 Hacé 2 clics sobre los extremos de la red (9 m)";
+  esperandoClics = true;
 });
 
 overlay.addEventListener("click", (e) => {
-  if (video.videoWidth === 0 || video.videoHeight === 0) {
-    alert("⏳ Esperá a que se cargue el video antes de marcar.");
-    return;
-  }
-
-  if (clicks.length >= 2) return;
-
-  const rect = video.getBoundingClientRect();
-  const scaleX = video.videoWidth / rect.width;
-  const scaleY = video.videoHeight / rect.height;
-  const x = (e.clientX - rect.left) * scaleX;
-  const y = (e.clientY - rect.top) * scaleY;
+  if (!esperandoClics || clicks.length >= 2) return;
+  const rect = overlay.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
 
   clicks.push({x, y});
   drawPoint(x, y, "green");
@@ -94,10 +99,16 @@ overlay.addEventListener("click", (e) => {
     const dy = clicks[1].y - clicks[0].y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     escala = 9 / dist;
-    output.innerHTML = `✅ Escala definida: 1 px = ${escala.toFixed(4)} m.<br>Presioná ▶️ para iniciar tracking.`;
-    tracking = true;
-    trackMotion();
+    output.innerHTML = `✅ Escala definida: 1 px = ${escala.toFixed(4)} m.`;
+    iniciarBtn.disabled = false;
+    esperandoClics = false;
   }
+});
+
+iniciarBtn.addEventListener("click", () => {
+  tracking = true;
+  trackMotion();
+  output.innerHTML = "🟢 Tracking activo...";
 });
 
 function drawPoint(x, y, color = "red") {
@@ -183,8 +194,9 @@ resetBtn.addEventListener("click", () => {
   previousFrame = null;
   trackingData = [];
   tracking = false;
+  iniciarBtn.disabled = true;
   ctx.clearRect(0, 0, overlay.width, overlay.height);
-  output.innerText = "📌 Cargá un video y pausalo. Luego hacé dos clics sobre la red.";
+  output.innerText = "📌 Cargá un video y pausalo. Luego usá los botones para marcar referencia y trackear.";
 });
 
 videoInput.addEventListener("change", (e) => {
