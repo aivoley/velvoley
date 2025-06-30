@@ -54,7 +54,6 @@ const togglePlay = document.getElementById("togglePlay");
 const resetBtn = document.getElementById("resetBtn");
 const stepBack = document.getElementById("stepBack");
 const stepForward = document.getElementById("stepForward");
-const listaHistorial = document.getElementById("listaHistorial");
 const videoInput = document.getElementById("videoInput");
 const startCamera = document.getElementById("startCamera");
 const mode = document.getElementById("mode");
@@ -68,17 +67,27 @@ let previousFrame = null;
 video.addEventListener("loadedmetadata", () => {
   overlay.width = video.videoWidth;
   overlay.height = video.videoHeight;
+  ctx.clearRect(0, 0, overlay.width, overlay.height);
+  output.innerHTML = "🎯 Hacé clic en los dos extremos de la red (9 m) para calibrar la escala.";
 });
 
 overlay.addEventListener("click", (e) => {
+  if (video.videoWidth === 0 || video.videoHeight === 0) {
+    alert("⏳ Esperá a que se cargue el video antes de marcar.");
+    return;
+  }
+
   if (clicks.length >= 2) return;
+
   const rect = video.getBoundingClientRect();
   const scaleX = video.videoWidth / rect.width;
   const scaleY = video.videoHeight / rect.height;
   const x = (e.clientX - rect.left) * scaleX;
   const y = (e.clientY - rect.top) * scaleY;
+
   clicks.push({x, y});
   drawPoint(x, y, "green");
+
   if (clicks.length === 2) {
     drawLine(clicks[0], clicks[1], "green");
     const dx = clicks[1].x - clicks[0].x;
@@ -216,4 +225,3 @@ mode.addEventListener("change", () => {
 
 </body>
 </html>
-
